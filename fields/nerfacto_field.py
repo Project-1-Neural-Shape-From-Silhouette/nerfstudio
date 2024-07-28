@@ -162,7 +162,8 @@ class NerfactoField(Field):
                 implementation=implementation,
             )
             self.field_head_transient_uncertainty = UncertaintyFieldHead(in_dim=self.mlp_transient.get_out_dim())
-            self.field_head_transient_rgb = TransientRGBFieldHead(in_dim=self.mlp_transient.get_out_dim())
+            #self.field_head_transient_rgb = TransientRGBFieldHead(in_dim=self.mlp_transient.get_out_dim())
+            self.field_head_transient_binary = TransientBinaryFieldHead(in_dim=self.mlp_transient.get_out_dim())
             self.field_head_transient_density = TransientDensityFieldHead(in_dim=self.mlp_transient.get_out_dim())
 
         # semantics
