@@ -24,6 +24,7 @@ from typing import Dict, List, Literal, Tuple, Type
 import numpy as np
 import torch
 from torch.nn import Parameter
+from torch.nn import BCEWithLogitsLoss
 
 from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
 from nerfstudio.cameras.rays import RayBundle, RaySamples
@@ -242,7 +243,7 @@ class NerfactoModel(Model):
 
         # losses
         self.rgb_loss = MSELoss()
-        self.binary_loss = MSELoss()#修改
+        self.binary_loss = BCEWithLogitsLoss()#修改
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure
