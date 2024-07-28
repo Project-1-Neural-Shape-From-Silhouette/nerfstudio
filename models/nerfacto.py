@@ -174,7 +174,7 @@ class NerfactoModel(Model):
         
 
         self.camera_optimizer: CameraOptimizer = self.config.camera_optimizer.setup(
-            num_cameras=self.num_train_data, device="mps"#修改前cpu
+            num_cameras=self.num_train_data, device="cpu"
         )
         self.density_fns = []
         num_prop_nets = self.config.num_proposal_iterations
