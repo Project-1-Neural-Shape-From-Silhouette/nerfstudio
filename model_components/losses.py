@@ -28,8 +28,10 @@ from nerfstudio.utils.math import masked_reduction, normalized_depth_scale_and_s
 
 L1Loss = nn.L1Loss
 MSELoss = nn.MSELoss
+BCEWithLogitsLoss=nn.BCEWithLogitsLoss
 
-LOSSES = {"L1": L1Loss, "MSE": MSELoss}
+LOSSES = {"L1": L1Loss, "MSE": MSELoss, "BCE": BCEWithLogitsLoss}
+#LOSSES = {"L1": L1Loss, "MSE": MSELoss}
 
 EPS = 1.0e-7
 
