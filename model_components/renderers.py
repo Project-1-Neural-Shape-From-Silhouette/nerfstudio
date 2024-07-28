@@ -39,9 +39,11 @@ from nerfstudio.cameras.rays import RaySamples
 from nerfstudio.utils import colors
 from nerfstudio.utils.math import components_from_spherical_harmonics, safe_normalize
 
-BackgroundColor = Union[Literal["random", "last_sample", "black", "white"], Float[Tensor, "3"], Float[Tensor, "*bs 3"]]
-BACKGROUND_COLOR_OVERRIDE: Optional[Float[Tensor, "3"]] = None
+#BackgroundColor = Union[Literal["random", "last_sample", "black", "white"], Float[Tensor, "3"], Float[Tensor, "*bs 3"]]
+#BACKGROUND_COLOR_OVERRIDE: Optional[Float[Tensor, "3"]] = None
 
+BackgroundColor = Union[Literal["black", "white"], Float[Tensor, "1"], Float[Tensor, "*bs 1"]]
+BACKGROUND_COLOR_OVERRIDE: Optional[BackgroundColor] = torch.tensor([0.5])
 
 @contextlib.contextmanager
 def background_color_override_context(mode: Float[Tensor, "3"]) -> Generator[None, None, None]:
@@ -53,6 +55,184 @@ def background_color_override_context(mode: Float[Tensor, "3"]) -> Generator[Non
         yield
     finally:
         BACKGROUND_COLOR_OVERRIDE = old_background_color
+
+ 
+class BinaryRenderer(nn.Module):
+    """标准二进制渲染。
+    
+    Args:
+        background_color: 背景颜色为0或1。如果为None，则使用随机颜色。
+    """
+    
+    def __init__(self, background_color: BackgroundColor = "random") -> None:
+        super().__init__()
+        self.background_color: BackgroundColor = background_color
+
+    @classmethod
+    def combine_binary(
+        cls,
+        binary: Float[Tensor, "*bs num_samples 1"],
+        weights: Float[Tensor, "*bs num_samples 1"],
+        background_color: BackgroundColor = "random",
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+    ) -> Float[Tensor, "*bs 1"]:
+        """沿着射线组合样本并渲染二进制图像。
+        
+        如果背景颜色是随机的，则不会添加背景颜色 - 就好像背景是黑色的一样！
+        
+        Args:
+            binary: 每个样本的二进制值
+            weights: 每个样本的权重
+            background_color: 背景颜色为0或1。
+            ray_indices: 每个样本的射线索引，用于打包样本时。
+            num_rays: 射线数量，用于打包样本时。
+
+        Returns:
+            输出的二进制值。
+        """
+        if ray_indices is not None and num_rays is not None:
+            # 对于从体积射线采样器打包的样本是必要的
+            if background_color == "last_sample":
+                raise NotImplementedError("背景颜色 'last_sample' 未对打包样本实现。")
+            comp_binary = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=binary, ray_indices=ray_indices, n_rays=num_rays
+            )
+            accumulated_weight = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+            )
+        else:
+            comp_binary = torch.sum(weights * binary, dim=-2)
+            accumulated_weight = torch.sum(weights, dim=-2)
+        if BACKGROUND_COLOR_OVERRIDE is not None:
+            background_color = BACKGROUND_COLOR_OVERRIDE
+        if background_color == "random":
+            # 如果背景颜色是随机的，则返回预测颜色而不进行混合，
+            # 就像背景颜色是黑色的一样。
+            return comp_binary
+        elif background_color == "last_sample":
+            # 注意，这仅支持非打包样本。
+            background_color = binary[..., -1, :]
+        background_color = cls.get_background_color(background_color, shape=comp_binary.shape, device=comp_binary.device)
+
+        assert isinstance(background_color, torch.Tensor)
+        comp_binary = comp_binary + background_color * (1.0 - accumulated_weight)
+        return comp_binary
+
+    @classmethod
+    def get_background_color(
+        cls, background_color: BackgroundColor, shape: Tuple[int, ...], device: torch.device
+    ) -> Union[Float[Tensor, "1"], Float[Tensor, "*bs 1"]]:
+        """返回指定背景颜色的二进制背景颜色。
+        
+        注意：
+            此函数不能在背景颜色为 "last_sample" 或 "random" 时调用。
+
+        Args:
+            background_color: 背景颜色规格。如果提供的是字符串，则必须是有效的颜色名称。
+            shape: 输出张量的形状。
+            device: 创建张量的设备。
+
+        Returns:
+            作为二进制的背景颜色。
+        """
+        assert background_color not in {"last_sample", "random"}
+        assert shape[-1] == 1, "背景颜色必须是二进制。"
+        if BACKGROUND_COLOR_OVERRIDE is not None:
+            background_color = BACKGROUND_COLOR_OVERRIDE
+        if isinstance(background_color, str):
+            background_color = torch.tensor([1.0 if background_color == "white" else 0.0])
+        assert isinstance(background_color, Tensor)
+
+        # 确保正确的形状
+        return background_color.expand(shape).to(device)
+
+    def blend_background(
+        self,
+        image: Tensor,
+        background_color: Optional[BackgroundColor] = None,
+    ) -> Float[Tensor, "*bs 1"]:
+        """将背景颜色混合到图像中，如果图像是二进制。
+        
+        否则不进行混合（我们假设不透明度为1）。
+
+        Args:
+            image: 每个像素的二进制值。
+            background_color: 背景颜色。
+
+        Returns:
+            混合后的二进制值。
+        """
+        if image.size(-1) < 2:
+            return image
+
+        binary, opacity = image[..., :1], image[..., 1:]
+        if background_color is None:
+            background_color = self.background_color
+            if background_color in {"last_sample", "random"}:
+                background_color = "black"
+        background_color = self.get_background_color(background_color, shape=binary.shape, device=binary.device)
+        assert isinstance(background_color, torch.Tensor)
+        return binary * opacity + background_color.to(binary.device) * (1 - opacity)
+
+    def blend_background_for_loss_computation(
+        self,
+        pred_image: Tensor,
+        pred_accumulation: Tensor,
+        gt_image: Tensor,
+    ) -> Tuple[Tensor, Tensor]:
+        """在损失计算中将背景颜色混合到真实图像和预测图像中。
+
+        Args:
+            gt_image: 真实图像。
+            pred_image: 预测的二进制值（不带背景混合）。
+            pred_accumulation: 预测的不透明度/积累值。
+
+        Returns:
+            预测和真实二进制值的元组。
+        """
+        background_color = self.background_color
+        if background_color == "last_sample":
+            background_color = "black" 
+        elif background_color == "random":
+            background_color = torch.rand_like(pred_image)
+            pred_image = pred_image + background_color * (1.0 - pred_accumulation)
+        gt_image = self.blend_background(gt_image, background_color=background_color)
+        return pred_image, gt_image
+
+    def forward(
+        self,
+        binary: Float[Tensor, "*bs num_samples 1"],
+        weights: Float[Tensor, "*bs num_samples 1"],
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+        background_color: Optional[BackgroundColor] = None,
+    ) -> Float[Tensor, "*bs 1"]:
+        """沿着射线组合样本并渲染二进制图像
+
+        Args:
+            binary: 每个样本的二进制值
+            weights: 每个样本的权重
+            ray_indices: 每个样本的射线索引，用于打包样本时。
+            num_rays: 射线数量，用于打包样本时。
+            background_color: 渲染时使用的背景颜色。
+
+        Returns:
+            输出的二进制值。
+        """
+
+        if background_color is None:
+            background_color = self.background_color
+
+        if not self.training:
+            binary = torch.nan_to_num(binary)
+        binary = self.combine_binary(
+            binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
+        )
+        if not self.training:
+            torch.clamp_(binary, min=0.0, max=1.0)
+        return binary
+
 
 
 class RGBRenderer(nn.Module):
