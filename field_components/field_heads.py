@@ -36,6 +36,7 @@ class FieldHeadNames(Enum):
     UNCERTAINTY = "uncertainty"
     BACKGROUND_RGB = "background_rgb"
     TRANSIENT_RGB = "transient_rgb"
+    TRANSIENT_BINARY = "transient_binary"
     TRANSIENT_DENSITY = "transient_density"
     SEMANTICS = "semantics"
     SDF = "sdf"
@@ -169,6 +170,17 @@ class TransientRGBFieldHead(FieldHead):
 
     def __init__(self, in_dim: Optional[int] = None, activation: Optional[nn.Module] = nn.Sigmoid()) -> None:
         super().__init__(in_dim=in_dim, out_dim=3, field_head_name=FieldHeadNames.TRANSIENT_RGB, activation=activation)
+
+class TransientBinaryFieldHead(FieldHead):
+    """Transient RGB output
+
+    Args:
+        in_dim: input dimension. If not defined in constructor, it must be set later.
+        activation: output head activation
+    """
+
+    def __init__(self, in_dim: Optional[int] = None, activation: Optional[nn.Module] = nn.Sigmoid()) -> None:
+        super().__init__(in_dim=in_dim, out_dim=1, field_head_name=FieldHeadNames.TRANSIENT_BINARY, activation=activation)
 
 
 class TransientDensityFieldHead(FieldHead):
