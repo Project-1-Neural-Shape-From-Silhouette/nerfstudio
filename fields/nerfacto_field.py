@@ -33,6 +33,7 @@ from nerfstudio.field_components.field_heads import (
     SemanticFieldHead,
     TransientDensityFieldHead,
     TransientRGBFieldHead,
+    TransientBinaryFieldHead,
     UncertaintyFieldHead,
     BinaryFieldHead,
 )
@@ -198,7 +199,7 @@ class NerfactoField(Field):
             layer_width=hidden_dim_color,
             out_dim=1,
             activation=nn.ReLU(),
-            out_activation=nn.Sigmoid(),
+            out_activation=None,#nn.Sigmoid(),
             implementation=implementation,
         )
 
