@@ -34,6 +34,7 @@ from nerfstudio.field_components.field_heads import (
     TransientDensityFieldHead,
     TransientRGBFieldHead,
     UncertaintyFieldHead,
+    BinaryFieldHead,
 )
 from nerfstudio.field_components.mlp import MLP, MLPWithHashEncoding
 from nerfstudio.field_components.spatial_distortions import SpatialDistortion
@@ -195,7 +196,7 @@ class NerfactoField(Field):
             in_dim=self.direction_encoding.get_out_dim() + self.geo_feat_dim + self.appearance_embedding_dim,
             num_layers=num_layers_color,
             layer_width=hidden_dim_color,
-            out_dim=3,
+            out_dim=1,
             activation=nn.ReLU(),
             out_activation=nn.Sigmoid(),
             implementation=implementation,
@@ -302,5 +303,8 @@ class NerfactoField(Field):
         )
         rgb = self.mlp_head(h).view(*outputs_shape, -1).to(directions)
         outputs.update({FieldHeadNames.RGB: rgb})
+
+        binary = self.mlp_head(h).view(*outputs_shape, -1).to(directions)
+        outputs.update({FieldHeadNames.BINARY: binary})
 
         return outputs
