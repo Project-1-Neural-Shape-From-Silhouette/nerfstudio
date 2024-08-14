@@ -41,7 +41,7 @@ from nerfstudio.model_components.losses import (
     scale_gradients_by_distance_squared,
 )
 from nerfstudio.model_components.ray_samplers import ProposalNetworkSampler, UniformSampler
-from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, NormalsRenderer, RGBRenderer
+from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, NormalsRenderer, BinaryRenderer
 from nerfstudio.model_components.scene_colliders import NearFarCollider
 from nerfstudio.model_components.shaders import NormalsShader
 from nerfstudio.models.base_model import Model, ModelConfig
@@ -229,6 +229,248 @@ class NerfactoModel(Model):
         # Collider
         self.collider = NearFarCollider(near_plane=self.config.near_plane, far_plane=self.config.far_plane)
 
+        # renderers
+        self.renderer_binary = BinaryRenderer(background_color=self.config.background_color)
+        self.renderer_accumulation = AccumulationRenderer()
+        self.renderer_depth = DepthRenderer(method="median")
+        self.renderer_expected_depth = DepthRenderer(method="expected")
+        self.renderer_normals = NormalsRenderer()
+
+        # shaders
+        self.normals_shader = NormalsShader()
+
+        # losses
+        self.binary_loss = MSELoss()
+        self.step = 0
+        # metrics
+        from torchmetrics.functional import structural_similarity_index_measure
+        from torchmetrics.image import PeakSignalNoiseRatio
+        from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+
+        self.psnr = PeakSignalNoiseRatio(data_range=1.0)
+        self.ssim = structural_similarity_index_measure
+        self.lpips = LearnedPerceptualImagePatchSimilarity(normalize=True)
+        self.step = 0
+
+    def get_param_groups(self) -> Dict[str, List[Parameter]]:
+        param_groups = {}
+        param_groups["proposal_networks"] = list(self.proposal_networks.parameters())
+        param_groups["fields"] = list(self.field.parameters())
+        self.camera_optimizer.get_param_groups(param_groups=param_groups)
+        return param_groups
+
+    def get_training_callbacks(
+        self, training_callback_attributes: TrainingCallbackAttributes
+    ) -> List[TrainingCallback]:
+        callbacks = []
+        if self.config.use_proposal_weight_anneal:
+            # anneal the weights of the proposal network before doing PDF sampling
+            N = self.config.proposal_weights_anneal_max_num_iters
+
+            def set_anneal(step):
+                # https://arxiv.org/pdf/2111.12077.pdf eq. 18
+                self.step = step
+                train_frac = np.clip(step / N, 0, 1)
+                self.step = step
+
+                def bias(x, b):
+                    return b * x / ((b - 1) * x + 1)
+
+                anneal = bias(train_frac, self.config.proposal_weights_anneal_slope)
+                self.proposal_sampler.set_anneal(anneal)
+
+            callbacks.append(
+                TrainingCallback(
+                    where_to_run=[TrainingCallbackLocation.BEFORE_TRAIN_ITERATION],
+                    update_every_num_iters=1,
+                    func=set_anneal,
+                )
+            )
+            callbacks.append(
+                TrainingCallback(
+                    where_to_run=[TrainingCallbackLocation.AFTER_TRAIN_ITERATION],
+                    update_every_num_iters=1,
+                    func=self.proposal_sampler.step_cb,
+                )
+            )
+        return callbacks
+
+    def get_outputs(self, ray_bundle: RayBundle):
+        # apply the camera optimizer pose tweaks
+        if self.training:
+            self.camera_optimizer.apply_to_raybundle(ray_bundle)
+        ray_samples: RaySamples
+        ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
+        field_outputs = self.field.forward(ray_samples, compute_normals=self.config.predict_normals)
+        if self.config.use_gradient_scaling:
+            field_outputs = scale_gradients_by_distance_squared(field_outputs, ray_samples)
+
+        weights = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
+        weights_list.append(weights)
+        ray_samples_list.append(ray_samples)
+        binary = self.renderer_binary(binary=field_outputs[FieldHeadNames.BINARY], weights=weights)
+        #rgb = self.renderer_rgb(rgb=field_outputs[FieldHeadNames.RGB], weights=weights)[Qin]
+        with torch.no_grad():
+            depth = self.renderer_depth(weights=weights, ray_samples=ray_samples)
+        expected_depth = self.renderer_expected_depth(weights=weights, ray_samples=ray_samples)
+        accumulation = self.renderer_accumulation(weights=weights)
+
+        outputs = {
+            #"rgb": rgb,[Qin]
+            "binary": binary,
+            "accumulation": accumulation,
+            "depth": depth,
+            "expected_depth": expected_depth,
+        }
+
+        if self.config.predict_normals:
+            normals = self.renderer_normals(normals=field_outputs[FieldHeadNames.NORMALS], weights=weights)
+            pred_normals = self.renderer_normals(field_outputs[FieldHeadNames.PRED_NORMALS], weights=weights)
+            outputs["normals"] = self.normals_shader(normals)
+            outputs["pred_normals"] = self.normals_shader(pred_normals)
+        # These use a lot of GPU memory, so we avoid storing them for eval.
+        if self.training:
+            outputs["weights_list"] = weights_list
+            outputs["ray_samples_list"] = ray_samples_list
+
+        if self.training and self.config.predict_normals:
+            outputs["rendered_orientation_loss"] = orientation_loss(
+                weights.detach(), field_outputs[FieldHeadNames.NORMALS], ray_bundle.directions
+            )
+
+            outputs["rendered_pred_normal_loss"] = pred_normal_loss(
+                weights.detach(),
+                field_outputs[FieldHeadNames.NORMALS].detach(),
+                field_outputs[FieldHeadNames.PRED_NORMALS],
+            )
+
+        for i in range(self.config.num_proposal_iterations):
+            outputs[f"prop_depth_{i}"] = self.renderer_depth(weights=weights_list[i], ray_samples=ray_samples_list[i])
+        return outputs
+
+    def get_metrics_dict(self, outputs, batch):
+        metrics_dict = {}
+        '''
+        gt_rgb = batch["image"].to(self.device)  # RGB or RGBA image
+        gt_rgb = self.renderer_rgb.blend_background(gt_rgb)  # Blend if RGBA
+        predicted_rgb = outputs["rgb"]
+        metrics_dict["psnr"] = self.psnr(predicted_rgb, gt_rgb)
+        '''
+        gt_binary = batch["image"].to(self.device)  # Binary image
+        gt_binary = self.renderer_binary.blend_background(gt_binary)  # Blend if RGBA
+        predicted_binary = outputs["binary"]
+        metrics_dict["psnr"] = self.psnr(predicted_binary, gt_binary)
+
+
+        if self.training:
+            metrics_dict["distortion"] = distortion_loss(outputs["weights_list"], outputs["ray_samples_list"])
+
+        self.camera_optimizer.get_metrics_dict(metrics_dict)
+        return metrics_dict
+
+    def get_loss_dict(self, outputs, batch, metrics_dict=None):
+        loss_dict = {}
+        image = batch["image"].to(self.device)
+        '''
+        pred_rgb, gt_rgb = self.renderer_rgb.blend_background_for_loss_computation(
+            pred_image=outputs["rgb"],
+            pred_accumulation=outputs["accumulation"],
+            gt_image=image,
+        )
+        loss_dict["rgb_loss"] = self.rgb_loss(gt_rgb, pred_rgb)
+
+        '''
+
+        pred_binary, gt_binary = self.renderer_binary.blend_background_for_loss_computation(
+            pred_image=outputs["binary"],
+            pred_accumulation=outputs["accumulation"],
+            gt_image=image,
+        )
+        loss_dict["binary_loss"] = self.binary_loss(gt_binary, pred_binary)
+
+
+        if self.training:
+            loss_dict["interlevel_loss"] = self.config.interlevel_loss_mult * interlevel_loss(
+                outputs["weights_list"], outputs["ray_samples_list"]
+            )
+            assert metrics_dict is not None and "distortion" in metrics_dict
+            loss_dict["distortion_loss"] = self.config.distortion_loss_mult * metrics_dict["distortion"]
+            if self.config.predict_normals:
+                # orientation loss for computed normals
+                loss_dict["orientation_loss"] = self.config.orientation_loss_mult * torch.mean(
+                    outputs["rendered_orientation_loss"]
+                )
+
+                # ground truth supervision for normals
+                loss_dict["pred_normal_loss"] = self.config.pred_normal_loss_mult * torch.mean(
+                    outputs["rendered_pred_normal_loss"]
+                )
+            # Add loss from camera optimizer
+            self.camera_optimizer.get_loss_dict(loss_dict)
+        return loss_dict
+
+    def get_image_metrics_and_images(
+        self, outputs: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]
+    ) -> Tuple[Dict[str, float], Dict[str, torch.Tensor]]:
+        '''
+        gt_rgb = batch["image"].to(self.device)
+        predicted_rgb = outputs["rgb"]  # Blended with background (black if random background)
+        gt_rgb = self.renderer_rgb.blend_background(gt_rgb)
+        '''
+        gt_binary = batch["image"].to(self.device)
+        predicted_binary = outputs["binary"]
+        gt_binary = self.renderer_binary.blend_background(gt_binary)
+
+        acc = colormaps.apply_colormap(outputs["accumulation"])
+        depth = colormaps.apply_depth_colormap(
+            outputs["depth"],
+            accumulation=outputs["accumulation"],
+        )
+
+        #combined_rgb = torch.cat([gt_rgb, predicted_rgb], dim=1)[Qin]
+        combined_binary = torch.cat([gt_binary, predicted_binary], dim=1)
+
+        combined_acc = torch.cat([acc], dim=1)
+        combined_depth = torch.cat([depth], dim=1)
+
+        # Switch images from [H, W, C] to [1, C, H, W] for metrics computations
+        '''
+        gt_rgb = torch.moveaxis(gt_rgb, -1, 0)[None, ...]
+        predicted_rgb = torch.moveaxis(predicted_rgb, -1, 0)[None, ...]
+        psnr = self.psnr(gt_rgb, predicted_rgb)
+        ssim = self.ssim(gt_rgb, predicted_rgb)
+        lpips = self.lpips(gt_rgb, predicted_rgb)
+        '''
+
+        gt_binary = torch.moveaxis(gt_binary, -1, 0)[None, ...]
+        predicted_binary = torch.moveaxis(predicted_binary, -1, 0)[None, ...]
+        psnr = self.psnr(gt_binary, predicted_binary)
+        ssim = self.ssim(gt_binary, predicted_binary)
+        lpips = self.lpips(gt_binary, predicted_binary)
+
+
+
+        # all of these metrics will be logged as scalars
+        metrics_dict = {"psnr": float(psnr.item()), "ssim": float(ssim)}  # type: ignore
+        metrics_dict["lpips"] = float(lpips)
+
+        #images_dict = {"img": combined_rgb, "accumulation": combined_acc, "depth": combined_depth}
+        images_dict = {"img": combined_binary, "accumulation": combined_acc, "depth": combined_depth}
+
+
+        for i in range(self.config.num_proposal_iterations):
+            key = f"prop_depth_{i}"
+            prop_depth_i = colormaps.apply_depth_colormap(
+                outputs[key],
+                accumulation=outputs["accumulation"],
+            )
+            images_dict[key] = prop_depth_i
+
+        return metrics_dict, images_dict
+
+
+
+        '''
         # renderers
         self.renderer_rgb = RGBRenderer(background_color=self.config.background_color)
         self.renderer_accumulation = AccumulationRenderer()
@@ -429,3 +671,4 @@ class NerfactoModel(Model):
             images_dict[key] = prop_depth_i
 
         return metrics_dict, images_dict
+        '''
