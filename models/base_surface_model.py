@@ -33,7 +33,13 @@ from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.fields.nerfacto_field import NerfactoField
 from nerfstudio.fields.sdf_field import SDFFieldConfig
 from nerfstudio.fields.vanilla_nerf_field import NeRFField
-from nerfstudio.model_components.losses import L1Loss, MSELoss, ScaleAndShiftInvariantLoss, monosdf_normal_loss
+from nerfstudio.model_components.losses import (
+##    L1Loss, 
+##    MSELoss,
+    LOSSES,  ## Feng change 
+    ScaleAndShiftInvariantLoss, 
+    monosdf_normal_loss,
+)
 from nerfstudio.model_components.ray_samplers import LinearDisparitySampler
 from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, RGBRenderer, SemanticRenderer
 from nerfstudio.model_components.scene_colliders import AABBBoxCollider, NearFarCollider
