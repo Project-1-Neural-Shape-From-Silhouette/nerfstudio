@@ -241,7 +241,8 @@ class NerfactoModel(Model):
         self.normals_shader = NormalsShader()
 
         # losses
-        self.rgb_loss = MSELoss()
+##        self.rgb_loss = MSELoss()            original
+        self.binary_loss = LOSSES["BCE"]()  #change Feng
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure
