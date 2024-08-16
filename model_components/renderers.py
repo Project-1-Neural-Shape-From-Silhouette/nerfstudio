@@ -403,7 +403,7 @@ class BinaryRenderer(nn.Module):
             binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
         )
         if not self.training:
-            torch.clamp_(rgb, min=0.0, max=1.0)
+            torch.clamp_(binary, min=0.0, max=1.0)
         return binary # 返回的是二进制图像
 
 class SHRenderer(nn.Module):
