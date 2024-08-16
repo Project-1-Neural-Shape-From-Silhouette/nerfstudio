@@ -34,7 +34,7 @@ from nerfstudio.fields.density_fields import HashMLPDensityField
 from nerfstudio.fields.nerfacto_field import NerfactoField
 from nerfstudio.model_components.losses import (
 ##    MSELoss,
-    LOSSES,  ## Feng change
+    LOSSES,  ## change
     distortion_loss,
     interlevel_loss,
     orientation_loss,
