@@ -390,6 +390,16 @@ class NerfactoModel(Model):
                 )
             # Add loss from camera optimizer
             self.camera_optimizer.get_loss_dict(loss_dict)
+
+        #### change feng
+        total_loss = loss_dict.get("total_loss", sum(loss_dict.values()))          
+        log_message = (f"Train Loss: {total_loss.item():.4f}, "
+                       f"Validation PSNR: {metrics_dict['psnr']:.4f} ")
+        with open("training_log.txt", "a") as f:
+                f.write(log_message)
+        print(log_message)
+       #### change feng
+        
         return loss_dict
 
     def get_image_metrics_and_images(
