@@ -119,6 +119,7 @@ def generate_point_cloud(
     )
     points = []
     rgbs = []
+    binarys = []  #rgbs 
     normals = []
     view_directions = []
     with progress as progress_bar:
@@ -132,8 +133,8 @@ def generate_point_cloud(
                 outputs = pipeline.model(ray_bundle)
             if rgb_output_name not in outputs:
                 CONSOLE.rule("Error", style="red")
-                CONSOLE.print(f"Could not find {rgb_output_name} in the model outputs", justify="center")
-                CONSOLE.print(f"Please set --rgb_output_name to one of: {outputs.keys()}", justify="center")
+                CONSOLE.print(f"Could not find {binary_output_name} in the model outputs", justify="center")#change zhu
+                CONSOLE.print(f"Please set --binary_output_name to one of: {outputs.keys()}", justify="center")#change zhu
                 sys.exit(1)
             if depth_output_name not in outputs:
                 CONSOLE.rule("Error", style="red")
@@ -160,14 +161,15 @@ def generate_point_cloud(
             mask = rgba[..., -1] > 0.5
             point = point[mask]
             view_direction = view_direction[mask]
-            rgb = rgba[mask][..., :3]
+            #rgb = rgba[mask][..., :3]
+            binary = rgba[mask][..., :1]  #change zhu
             if normal is not None:
                 normal = normal[mask]
 
             if crop_obb is not None:
                 mask = crop_obb.within(point)
             point = point[mask]
-            rgb = rgb[mask]
+            binary = rgb[mask] #change zhu
             view_direction = view_direction[mask]
             if normal is not None:
                 normal = normal[mask]
@@ -227,7 +229,8 @@ def generate_point_cloud(
 def render_trajectory(
     pipeline: Pipeline,
     cameras: Cameras,
-    rgb_output_name: str,
+    #rgb_output_name: str,
+    binary_output_name: str,  #change zhu
     depth_output_name: str,
     rendered_resolution_scaling_factor: float = 1.0,
     disable_distortion: bool = False,
@@ -245,14 +248,14 @@ def render_trajectory(
         return_rgba_images: Whether to return RGBA images (default RGB).
 
     Returns:
-        List of rgb images, list of depth images.
+        List of binary images, list of depth images.
     """
     images = []
     depths = []
     cameras.rescale_output_resolution(rendered_resolution_scaling_factor)
 
     progress = Progress(
-        TextColumn(":cloud: Computing rgb and depth images :cloud:"),
+        TextColumn(":cloud: Computing binary and depth images :cloud:"),
         BarColumn(),
         TaskProgressColumn(show_speed=True),
         ItersPerSecColumn(suffix="fps"),
@@ -265,7 +268,8 @@ def render_trajectory(
             ).to(pipeline.device)
             with torch.no_grad():
                 outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
-            if rgb_output_name not in outputs:
+            #if rgb_output_name not in outputs:
+            if binary_output_name not in outputs:  #change zhu
                 CONSOLE.rule("Error", style="red")
                 CONSOLE.print(f"Could not find {rgb_output_name} in the model outputs", justify="center")
                 CONSOLE.print(f"Please set --rgb_output_name to one of: {outputs.keys()}", justify="center")
@@ -276,9 +280,9 @@ def render_trajectory(
                 CONSOLE.print(f"Please set --depth_output_name to one of: {outputs.keys()}", justify="center")
                 sys.exit(1)
             if return_rgba_images:
-                image = pipeline.model.get_rgba_image(outputs, rgb_output_name)
+                image = pipeline.model.get_rgba_image(outputs, binary_output_name)# change zhu
             else:
-                image = outputs[rgb_output_name]
+                image = outputs[binary_output_name]# change zhu
             images.append(image.cpu().numpy())
             depths.append(outputs[depth_output_name].cpu().numpy())
     return images, depths
