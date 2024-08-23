@@ -50,7 +50,7 @@ class TSDF:
     """TSDF values for each voxel."""
     weights: Float[Tensor, "xdim ydim zdim"]
     """TSDF weights for each voxel."""
-    colors: Float[Tensor, "xdim ydim zdim 3"]
+    colors: Float[Tensor, "xdim ydim zdim"] #"xdim ydim zdim 3" 
     """TSDF colors for each voxel."""
     voxel_size: Float[Tensor, "3"]
     """Size of each voxel in the TSDF. [x, y, z] size."""
@@ -107,8 +107,8 @@ class TSDF:
         # initialize the values and weights
         values = -torch.ones(volume_dims.tolist())
         weights = torch.zeros(volume_dims.tolist())
-        colors = torch.zeros(volume_dims.tolist() + [3])
-
+        colors = torch.zeros(volume_dims.tolist())#torch.zeros(volume_dims.tolist() + [3])liu
+        
         # TODO: move to device
 
         return TSDF(voxel_coords, values, weights, colors, voxel_size, origin)
@@ -154,8 +154,17 @@ class TSDF:
         v_normals_matrix = mesh.normals.cpu().numpy().astype("float64")
         v_color_matrix = mesh.colors.cpu().numpy().astype("float64")
         # colors need an alpha channel
-        v_color_matrix = np.concatenate([v_color_matrix, np.ones((v_color_matrix.shape[0], 1))], axis=-1)
 
+
+        v_color_matrix = v_color_matrix.reshape(-1,1)
+        print(v_color_matrix.shape)
+        #liu
+        
+        #v_color_matrix = np.concatenate([v_color_matrix, np.ones((v_color_matrix.shape[0], 3))], axis=-1)# v_color_matrix.shape[0], 1) original liu
+        v_color_matrix = np.concatenate([v_color_matrix, v_color_matrix, v_color_matrix, np.ones_like((v_color_matrix))], axis=-1)
+        print(v_color_matrix.shape)  
+
+        
         # create a new Mesh
         m = pymeshlab.Mesh(  # type: ignore
             vertex_matrix=vertex_matrix,
@@ -269,10 +278,19 @@ class TSDF:
 
             if sampled_colors is not None:
                 old_colors_i = self.colors[valid_points_i_shape]  # [M, 3]
+                '''
                 new_colors_i = sampled_colors[i][:, valid_points_i.squeeze(0)].permute(1, 0)  # [M, 3]
                 self.colors[valid_points_i_shape] = (
                     old_colors_i * old_weights_i[:, None] + new_colors_i * new_weights_i
                 ) / total_weights[:, None]
+                '''
+                
+                new_colors_i = sampled_colors[i,0][valid_points_i.squeeze(0)]      #.permute(1, 0)  sampled_colors[i,0]  liu 
+                # [M, 3] original
+                self.colors[valid_points_i_shape] = (
+                    old_colors_i * old_weights_i+ new_colors_i * new_weights_i
+                ) / total_weights    #[:, None] liu 2[]
+
 
 
 def export_tsdf_mesh(
