@@ -200,9 +200,9 @@ class ExportTSDFMesh(Exporter):
     """How many depth images to integrate per batch."""
     use_bounding_box: bool = True
     """Whether to use a bounding box for the TSDF volume."""
-    bounding_box_min: Tuple[float, float, float] = (-1, -1, -1)
+    bounding_box_min: Tuple[float, float, float] = (-0.36, -0.36, -0.8)
     """Minimum of the bounding box, used if use_bounding_box is True."""
-    bounding_box_max: Tuple[float, float, float] = (1, 1, 1)
+    bounding_box_max: Tuple[float, float, float] = (0.36, 0.36, -0.2)
     """Minimum of the bounding box, used if use_bounding_box is True."""
     texture_method: Literal["tsdf", "nerf"] = "nerf"
     """Method to texture the mesh with. Either 'tsdf' or 'nerf'."""
