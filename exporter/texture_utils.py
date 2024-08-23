@@ -404,10 +404,11 @@ def export_textured_mesh(
     with torch.no_grad():
         outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
     # TODO: this can be done better by using the alpha channel
-    rgb = pipeline.model.get_rgba_image(outputs, "rgb")[..., :3]
-
+    #rgb = pipeline.model.get_rgba_image(outputs, "rgb")[..., :3]
+    binary = pipeline.model.get_rgba_image(outputs, "binary")[..., 0]  #change zhu
     # save the texture image
-    texture_image = rgb.cpu().numpy()
+    #texture_image = rgb.cpu().numpy()
+    texture_image = binary.cpu().numpy()  #change zhu
     media.write_image(str(output_dir / "material_0.png"), texture_image)
 
     CONSOLE.print("Writing relevant OBJ information to files...")
