@@ -280,7 +280,7 @@ def export_tsdf_mesh(
     output_dir: Path,
     downscale_factor: int = 2,
     depth_output_name: str = "depth",
-    rgb_output_name: str = "rgb",
+    rgb_output_name: str = "binary", #change zhu
     resolution: Union[int, List[int]] = field(default_factory=lambda: [256, 256, 256]),
     batch_size: int = 10,
     use_bounding_box: bool = True,
@@ -327,7 +327,8 @@ def export_tsdf_mesh(
     color_images, depth_images = render_trajectory(
         pipeline,
         cameras,
-        rgb_output_name=rgb_output_name,
+       # rgb_output_name=rgb_output_name,
+        binary_output_name= binary_output_name, #change zhu
         depth_output_name=depth_output_name,
         rendered_resolution_scaling_factor=1.0 / downscale_factor,
         disable_distortion=True,
