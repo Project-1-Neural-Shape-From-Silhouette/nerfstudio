@@ -246,9 +246,9 @@ class BinaryRenderer(nn.Module):#liuyuhan
         cls,
         binary: Float[Tensor, "*bs num_samples 1"],
         weights: Float[Tensor, "*bs num_samples 1"],
-        #background_color: BackgroundColor = "random",
-        #ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
-        #num_rays: Optional[int] = None,
+        background_color: BackgroundColor = "random",
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
     ) -> Float[Tensor, "*bs 1"]:
         """Composite samples along ray and render color image.
         If background color is random, no BG color is added - as if the background was black!
@@ -292,9 +292,19 @@ class BinaryRenderer(nn.Module):#liuyuhan
         assert isinstance(background_color, torch.Tensor)
         comp_binary = comp_binary + background_color * (1.0 - accumulated_weight)
         '''
-
-        comp_binary=torch.sum(weights*binary,dim=-2)
-        
+        if ray_indices is not None and num_rays is not None:
+            # Necessary for packed samples from volumetric ray sampler
+            
+            comp_binary = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=binary, ray_indices=ray_indices, n_rays=num_rays
+            )
+            accumulated_weight = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+            )
+        else:
+            comp_binary = torch.sum(weights * binary, dim=-2)
+            accumulated_weight = torch.sum(weights, dim=-2)
+                    
         return comp_binary 
 
     @classmethod
@@ -354,7 +364,8 @@ class BinaryRenderer(nn.Module):#liuyuhan
                 background_color = "black"
         background_color = self.get_background_color(background_color, shape=binary.shape, device=binary.device)
         assert isinstance(background_color, torch.Tensor)
-        return binary * opacity + background_color.to(binary.device) * (1 - opacity)
+        return binary * 1 + background_color.to(binary.device) * (1 - opacity)
+        # return binary * opacity + background_color.to(binary.device) * (1 - opacity)
 
     def blend_background_for_loss_computation(
         self,
@@ -392,7 +403,7 @@ class BinaryRenderer(nn.Module):#liuyuhan
         ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
         num_rays: Optional[int] = None,
         background_color: Optional[BackgroundColor] = None,
-    ) -> Float[Tensor, "*bs 1"]:#*bs 3[Qin]
+    ) -> Float[Tensor, "*bs 1"]:#
         """Composite samples along ray and render color image
 
         Args:
@@ -405,23 +416,25 @@ class BinaryRenderer(nn.Module):#liuyuhan
         Returns:
             Outputs of binary values.
         """
-
+        '''
         if background_color is None:
             background_color = self.background_color
 
         if not self.training:
             binary = torch.nan_to_num(binary)
         binary = self.combine_binary(
-            binary, weights
+            binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
         )
+        
         '''
+        
         binary = self.combine_binary(
             binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
         )
-        '''
+        
         if not self.training:
             torch.clamp_(binary, min=0.0, max=1.0)
-        return binary 
+        return binary
 
 class SHRenderer(nn.Module):
     """Render RGB value from spherical harmonics.
