@@ -230,7 +230,7 @@ class RGBRenderer(nn.Module):
         return rgb
 
 
-class BinaryRenderer(nn.Module):
+class BinaryRenderer(nn.Module):#liuyuhan
     """Standard volumetric rendering.
 
     Args:
@@ -244,12 +244,12 @@ class BinaryRenderer(nn.Module):
     @classmethod
     def combine_binary(
         cls,
-        binary: Float[Tensor, "*bs num_samples 1"],#*bs num_samples 1[Qin]
+        binary: Float[Tensor, "*bs num_samples 1"],
         weights: Float[Tensor, "*bs num_samples 1"],
-        background_color: BackgroundColor = "random",
-        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
-        num_rays: Optional[int] = None,
-    ) -> Float[Tensor, "*bs 1"]:#*bs 3[Qin]
+        #background_color: BackgroundColor = "random",
+        #ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        #num_rays: Optional[int] = None,
+    ) -> Float[Tensor, "*bs 1"]:
         """Composite samples along ray and render color image.
         If background color is random, no BG color is added - as if the background was black!
 
@@ -263,6 +263,7 @@ class BinaryRenderer(nn.Module):
         Returns:
             Outputs binary values.
         """
+        '''
         if ray_indices is not None and num_rays is not None:
             # Necessary for packed samples from volumetric ray sampler
             if background_color == "last_sample":
@@ -290,12 +291,16 @@ class BinaryRenderer(nn.Module):
 
         assert isinstance(background_color, torch.Tensor)
         comp_binary = comp_binary + background_color * (1.0 - accumulated_weight)
+        '''
+
+        comp_binary=torch.sum(weights*binary,dim=-2)
+        
         return comp_binary 
 
     @classmethod
     def get_background_color(
         cls, background_color: BackgroundColor, shape: Tuple[int, ...], device: torch.device
-    ) -> Union[Float[Tensor, "1"], Float[Tensor, "*bs 1"]]:#Float[Tensor, "3"], Float[Tensor, "*bs 3"][Qin]
+    ) -> Union[Float[Tensor, "1"], Float[Tensor, "*bs 1"]]:
         """Returns the RGB background color for a specified background color.
         Note:
             This function CANNOT be called for background_color being either "last_sample" or "random".
@@ -308,6 +313,7 @@ class BinaryRenderer(nn.Module):
         Returns:
             Background color as RGB.
         """
+        '''
         assert background_color not in {"last_sample", "random"}
         assert shape[-1] == 1, "Background color must be binary."#assert shape[-1] == 3[Qin]
         if BACKGROUND_COLOR_OVERRIDE is not None:
@@ -318,13 +324,15 @@ class BinaryRenderer(nn.Module):
         assert isinstance(background_color, Tensor)
 
         # Ensure correct shape
-        return background_color.expand(shape).to(device)
+        '''
+        background_color = torch.tensor([0.0])
+        return background_color.to(device)
 
     def blend_background(
         self,
         image: Tensor,
         background_color: Optional[BackgroundColor] = None,
-    ) -> Float[Tensor, "*bs 1"]:#*bs 3[Qin]
+    ) -> Float[Tensor, "*bs 1"]:
         """Blends the background color into the image if image is RGBA.
         Otherwise no blending is performed (we assume opacity of 1).
 
@@ -336,7 +344,7 @@ class BinaryRenderer(nn.Module):
         Returns:
             Blended RGB.
         """
-        if image.size(-1) < 2:#< 4[Qin]
+        if image.size(-1) < 2:
             return image
 
         binary, opacity = image[..., :1], image[..., 1:]#image[..., :3], image[..., 3:][Qin]
@@ -365,17 +373,21 @@ class BinaryRenderer(nn.Module):
             A tuple of the predicted and ground truth RGB values.
         """
         background_color = self.background_color
+        '''
         if background_color == "last_sample":
             background_color = "black"  # No background blending for GT
         elif background_color == "random":
             background_color = torch.rand_like(pred_image)
             pred_image = pred_image + background_color * (1.0 - pred_accumulation)
+        '''
+        #There is no need to mix the backgroud_color for binary setting
+        
         gt_image = self.blend_background(gt_image, background_color=background_color)
         return pred_image, gt_image
 
     def forward(
         self,
-        binary: Float[Tensor, "*bs num_samples 1"],#*bs num_samples 3[Qin]
+        binary: Float[Tensor, "*bs num_samples 1"],
         weights: Float[Tensor, "*bs num_samples 1"],
         ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
         num_rays: Optional[int] = None,
@@ -391,7 +403,7 @@ class BinaryRenderer(nn.Module):
             background_color: The background color to use for rendering.
 
         Returns:
-            Outputs of rgb values.
+            Outputs of binary values.
         """
 
         if background_color is None:
@@ -400,11 +412,16 @@ class BinaryRenderer(nn.Module):
         if not self.training:
             binary = torch.nan_to_num(binary)
         binary = self.combine_binary(
+            binary, weights
+        )
+        '''
+        binary = self.combine_binary(
             binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
         )
+        '''
         if not self.training:
             torch.clamp_(binary, min=0.0, max=1.0)
-        return binary # 返回的是二进制图像
+        return binary 
 
 class SHRenderer(nn.Module):
     """Render RGB value from spherical harmonics.
