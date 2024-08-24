@@ -292,18 +292,8 @@ class BinaryRenderer(nn.Module):#liuyuhan
         assert isinstance(background_color, torch.Tensor)
         comp_binary = comp_binary + background_color * (1.0 - accumulated_weight)
         '''
-        if ray_indices is not None and num_rays is not None:
-            # Necessary for packed samples from volumetric ray sampler
-            
-            comp_binary = nerfacc.accumulate_along_rays(
-                weights[..., 0], values=binary, ray_indices=ray_indices, n_rays=num_rays
-            )
-            accumulated_weight = nerfacc.accumulate_along_rays(
-                weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
-            )
-        else:
-            comp_binary = torch.sum(weights * binary, dim=-2)
-            accumulated_weight = torch.sum(weights, dim=-2)
+        comp_binary = torch.sum(weights * binary, dim=-2)
+        accumulated_weight = torch.sum(weights, dim=-2)
                     
         return comp_binary 
 
@@ -427,10 +417,11 @@ class BinaryRenderer(nn.Module):#liuyuhan
         )
         
         '''
-        
+
         binary = self.combine_binary(
-            binary, weights, background_color=background_color, ray_indices=ray_indices, num_rays=num_rays
+            binary, weights,ray_indices=ray_indices
         )
+        
         
         if not self.training:
             torch.clamp_(binary, min=0.0, max=1.0)
