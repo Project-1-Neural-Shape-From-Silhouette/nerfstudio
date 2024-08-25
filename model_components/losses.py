@@ -26,14 +26,36 @@ from nerfstudio.cameras.rays import RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.utils.math import masked_reduction, normalized_depth_scale_and_shift
 
-## Original
-##L1Loss = nn.L1Loss
-##MSELoss = nn.MSELoss
-##LOSSES = {"L1": L1Loss, "MSE": MSELoss}
+L1Loss = nn.L1Loss
+MSELoss = nn.MSELoss
+#### change feng
+class SmoothL1Loss(nn.Module):
+    def __init__(self, beta=1.0, epsilon=1e-6):
+        super(SmoothL1Loss, self).__init__()
+        self.beta = beta
+        self.epsilon = epsilon
 
-## Feng change
-LOSSES = {"BCE": nn.BCEWithLogitsLoss}
-##
+    def forward(self, predictions, targets):
+        diff = torch.abs(predictions - targets)
+        diff = torch.clamp(diff, max=1e6)  # 限制差值的最大值，防止溢出
+        loss = torch.where(
+            diff < self.beta,
+            0.5 * diff ** 2 / (self.beta + self.epsilon),
+            diff - 0.5 * self.beta
+        )
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
+            print("NaN or Inf detected in loss computation")
+        return torch.mean(loss)
+
+
+KLDLoss = nn.KLDivLoss(reduction='batchmean')
+
+
+
+
+LOSSES = {"L1": L1Loss, "MSE": MSELoss, "SmoothL1": SmoothL1Loss}
+####change feng
+
 
 EPS = 1.0e-7
 
