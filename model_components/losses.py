@@ -28,6 +28,7 @@ from nerfstudio.utils.math import masked_reduction, normalized_depth_scale_and_s
 
 L1Loss = nn.L1Loss
 MSELoss = nn.MSELoss
+
 #### change feng
 class SmoothL1Loss(nn.Module):
     def __init__(self, beta=1.0, epsilon=1e-6):
@@ -48,12 +49,44 @@ class SmoothL1Loss(nn.Module):
         return torch.mean(loss)
 
 
-KLDLoss = nn.KLDivLoss(reduction='batchmean')
+class DiceLoss(nn.Module):
+    def __init__(self, smooth=1.0):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+
+    def forward(self, inputs, targets):
+        # Apply sigmoid if not already done
+        inputs = torch.sigmoid(inputs)
+
+        # Check if targets need to be one-hot encoded
+        if targets.size(1) == 1 and inputs.size(1) == 2:
+            # Convert targets to one-hot
+            targets = torch.nn.functional.one_hot(targets.squeeze().long(), num_classes=2)
+        
+        # Ensure the shapes match
+        if inputs.size() != targets.size():
+            raise ValueError(f"Shape mismatch: inputs shape {inputs.size()} and targets shape {targets.size()} must be the same")
+
+        # Flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
+
+        intersection = (inputs * targets).sum()
+        dice = (2. * intersection + self.smooth) / (inputs.sum() + targets.sum() + self.smooth)
+        loss = 1 - dice
+
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
+            print("NaN or Inf detected in Dice loss computation")
+
+        return loss
 
 
 
 
-LOSSES = {"L1": L1Loss, "MSE": MSELoss, "SmoothL1": SmoothL1Loss}
+
+
+
+LOSSES = {"L1": L1Loss, "MSE": MSELoss, "SmoothL1": SmoothL1Loss, "Dice":DiceLoss}
 ####change feng
 
 
