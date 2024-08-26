@@ -37,7 +37,7 @@ from nerfstudio.model_components.losses import (
     ####change Feng
     L1Loss,
     SmoothL1Loss,
-    KLDLoss,
+    DiceLoss,
     ####change feng
     distortion_loss,
     interlevel_loss,
@@ -249,6 +249,8 @@ class NerfactoModel(Model):
         #self.binary_loss = MSELoss()
         #self.binary_loss = L1Loss()
         self.binary_loss = SmoothL1Loss()
+        #self.binary_loss = DiceLoss()
+        ###change feng
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure
