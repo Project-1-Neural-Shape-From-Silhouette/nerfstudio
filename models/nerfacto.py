@@ -38,6 +38,8 @@ from nerfstudio.model_components.losses import (
     L1Loss,
     SmoothL1Loss,
     DiceLoss,
+    CustomBCELoss,
+    CharbonnierLoss,
     ####change feng
     distortion_loss,
     interlevel_loss,
@@ -245,12 +247,14 @@ class NerfactoModel(Model):
         self.normals_shader = NormalsShader()
 
         # losses
-        ####change feng: MSE to L1,SmoothL1Loss
-        #self.binary_loss = MSELoss()
+        ####change feng: MSE to L1,SmoothL1,Dice,BCE
+        self.binary_loss = MSELoss()
         #self.binary_loss = L1Loss()
-        self.binary_loss = SmoothL1Loss()
+        #self.binary_loss = SmoothL1Loss()
         #self.binary_loss = DiceLoss()
-        ###change feng
+        #self.binary_loss = CustomBCELoss()
+        #self.binary_loss = CharbonnierLoss()
+        ####change feng
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure
