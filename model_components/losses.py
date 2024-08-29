@@ -80,13 +80,69 @@ class DiceLoss(nn.Module):
 
         return loss
 
+class CustomBCELoss(nn.Module):
+    def __init__(self, epsilon=1e-6):
+        super(CustomBCELoss, self).__init__()
+        self.epsilon = epsilon
+
+    def forward(self, predictions, targets):
+        # Apply sigmoid to predictions if they are logits
+        predictions = torch.sigmoid(predictions)
+
+        # Clamp predictions to avoid log(0) situation
+        predictions = torch.clamp(predictions, self.epsilon, 1.0 - self.epsilon)
+
+        # Compute BCE loss
+        loss = -(targets * torch.log(predictions) + (1 - targets) * torch.log(1 - predictions))
+
+        # Check for NaN or Inf in loss computation
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
+            print("NaN or Inf detected in BCE loss computation")
+
+        return torch.mean(loss)
+
+class CharbonnierLoss(nn.Module):
+    """Charbonnier Loss (L1) with a format similar to SmoothL1Loss."""
+
+    def __init__(self, epsilon=1e-6):
+        """
+        初始化Charbonnier Loss
+        
+        参数:
+        epsilon (float): 防止平方根中出现零的极小常数，默认为1e-6
+        """
+        super(CharbonnierLoss, self).__init__()
+        self.epsilon = epsilon
+
+    def forward(self, predictions, targets):
+        """
+        前向传播函数，计算损失值
+
+        参数:
+        predictions (torch.Tensor): 模型的预测值
+        targets (torch.Tensor): 目标值（真实值）
+
+        返回:
+        torch.Tensor: 计算得到的Charbonnier Loss值
+        """
+        diff = predictions - targets
+        # Calculate the Charbonnier loss
+        loss = torch.sqrt(diff.pow(2) + self.epsilon**2)
+
+        # Clamp the loss to prevent overflow
+        loss = torch.clamp(loss, max=1e6)
+
+        # Check for NaN or Inf values in the loss computation
+        if torch.isnan(loss).any() or torch.isinf(loss).any():
+            print("NaN or Inf detected in Charbonnier loss computation")
+
+        # Return the mean loss
+        return torch.mean(loss)
 
 
 
 
-
-
-LOSSES = {"L1": L1Loss, "MSE": MSELoss, "SmoothL1": SmoothL1Loss, "Dice":DiceLoss}
+LOSSES = {"L1": L1Loss, "MSE": MSELoss, "SmoothL1": SmoothL1Loss, "Dice":DiceLoss, "BCE":CustomBCELoss, "Charbonnier":CharbonnierLoss}
 ####change feng
 
 
