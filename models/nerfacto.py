@@ -33,7 +33,8 @@ from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.fields.density_fields import HashMLPDensityField
 from nerfstudio.fields.nerfacto_field import NerfactoField
 from nerfstudio.model_components.losses import (
-    MSELoss,
+##    MSELoss,
+    LOSSES,  ## Feng change
     distortion_loss,
     interlevel_loss,
     orientation_loss,
@@ -482,7 +483,8 @@ class NerfactoModel(Model):
         self.normals_shader = NormalsShader()
 
         # losses
-        self.rgb_loss = MSELoss()
+##        self.rgb_loss = MSELoss()            original
+        self.binary_loss = LOSSES["BCE"]()  #change Feng
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure

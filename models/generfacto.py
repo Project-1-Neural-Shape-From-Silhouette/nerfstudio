@@ -34,7 +34,13 @@ from nerfstudio.fields.generfacto_field import GenerfactoField
 from nerfstudio.generative.deepfloyd import DeepFloyd
 from nerfstudio.generative.positional_text_embeddings import PositionalTextEmbeddings
 from nerfstudio.generative.stable_diffusion import StableDiffusion
-from nerfstudio.model_components.losses import MSELoss, distortion_loss, interlevel_loss, orientation_loss
+from nerfstudio.model_components.losses import (
+##    MSELoss,
+    LOSSES,  ## Feng change 
+    distortion_loss, 
+    interlevel_loss, 
+    orientation_loss,
+)
 from nerfstudio.model_components.ray_samplers import ProposalNetworkSampler, UniformSampler
 from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, NormalsRenderer, RGBRenderer
 from nerfstudio.model_components.scene_colliders import AABBBoxCollider, SphereCollider

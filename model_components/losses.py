@@ -26,10 +26,14 @@ from nerfstudio.cameras.rays import RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.utils.math import masked_reduction, normalized_depth_scale_and_shift
 
-L1Loss = nn.L1Loss
-MSELoss = nn.MSELoss
+## Original
+##L1Loss = nn.L1Loss
+##MSELoss = nn.MSELoss
+##LOSSES = {"L1": L1Loss, "MSE": MSELoss}
 
-LOSSES = {"L1": L1Loss, "MSE": MSELoss}
+## Feng change
+LOSSES = {"BCE": nn.BCEWithLogitsLoss}
+##
 
 EPS = 1.0e-7
 

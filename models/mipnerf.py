@@ -26,7 +26,11 @@ from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.field_components.encodings import NeRFEncoding
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.fields.vanilla_nerf_field import NeRFField
-from nerfstudio.model_components.losses import MSELoss, scale_gradients_by_distance_squared
+from nerfstudio.model_components.losses import (
+##    MSELoss,
+    LOSSES,  ## Feng change 
+    scale_gradients_by_distance_squared,
+)
 from nerfstudio.model_components.ray_samplers import PDFSampler, UniformSampler
 from nerfstudio.model_components.renderers import AccumulationRenderer, DepthRenderer, RGBRenderer
 from nerfstudio.models.base_model import Model

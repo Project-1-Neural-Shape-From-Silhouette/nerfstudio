@@ -106,7 +106,8 @@ class ExportPointCloud(Exporter):
     """Name of the normal output."""
     depth_output_name: str = "depth"
     """Name of the depth output."""
-    rgb_output_name: str = "rgb"
+    #rgb_output_name: str = "rgb"
+    binary_output_name: str = "binary" #change zhu
     """Name of the RGB output."""
 
     obb_center: Optional[Tuple[float, float, float]] = None
@@ -152,7 +153,8 @@ class ExportPointCloud(Exporter):
             remove_outliers=self.remove_outliers,
             reorient_normals=self.reorient_normals,
             estimate_normals=estimate_normals,
-            rgb_output_name=self.rgb_output_name,
+            #rgb_output_name=self.rgb_output_name,
+            binary_output_name= self.binary_output_name,  #change zhu
             depth_output_name=self.depth_output_name,
             normal_output_name=self.normal_output_name if self.normal_method == "model_output" else None,
             crop_obb=crop_obb,
@@ -192,7 +194,8 @@ class ExportTSDFMesh(Exporter):
     """Downscale the images starting from the resolution used for training."""
     depth_output_name: str = "depth"
     """Name of the depth output."""
-    rgb_output_name: str = "rgb"
+    #rgb_output_name: str = "rgb"
+    binary_output_name: str = "binary"#change zhu
     """Name of the RGB output."""
     resolution: Union[int, List[int]] = field(default_factory=lambda: [128, 128, 128])
     """Resolution of the TSDF volume or [x, y, z] resolutions individually."""
@@ -269,7 +272,8 @@ class ExportPoissonMesh(Exporter):
     """Reorient point cloud normals based on view direction."""
     depth_output_name: str = "depth"
     """Name of the depth output."""
-    rgb_output_name: str = "rgb"
+   # rgb_output_name: str = "rgb"
+    binary_output_name: str = "binary"#change zhu
     """Name of the RGB output."""
     normal_method: Literal["open3d", "model_output"] = "model_output"
     """Method to estimate normals with."""
@@ -335,7 +339,8 @@ class ExportPoissonMesh(Exporter):
             remove_outliers=self.remove_outliers,
             reorient_normals=self.reorient_normals,
             estimate_normals=estimate_normals,
-            rgb_output_name=self.rgb_output_name,
+           # rgb_output_name=self.rgb_output_name,
+            binary_output_name=self.binary_output_name,#change zhu
             depth_output_name=self.depth_output_name,
             normal_output_name=self.normal_output_name if self.normal_method == "model_output" else None,
             crop_obb=crop_obb,
