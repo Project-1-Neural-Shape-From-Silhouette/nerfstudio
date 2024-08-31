@@ -1,4 +1,4 @@
-# nerfstudio
+# Adapting Neural Radiance Fields for Shape-from-Silhouette Reconstruction
 ## Contribution
 ### Yuhan Liu
 1. Modified the traditional NeRF pipeline to adapt it for binary data.
