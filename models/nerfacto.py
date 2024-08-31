@@ -33,8 +33,14 @@ from nerfstudio.field_components.spatial_distortions import SceneContraction
 from nerfstudio.fields.density_fields import HashMLPDensityField
 from nerfstudio.fields.nerfacto_field import NerfactoField
 from nerfstudio.model_components.losses import (
-##    MSELoss,
-    LOSSES,  ## Feng change
+    MSELoss,
+    ####change Feng
+    L1Loss,
+    SmoothL1Loss,
+    DiceLoss,
+    CustomBCELoss,
+    CharbonnierLoss,
+    ####change feng
     distortion_loss,
     interlevel_loss,
     orientation_loss,
@@ -483,8 +489,14 @@ class NerfactoModel(Model):
         self.normals_shader = NormalsShader()
 
         # losses
-##        self.rgb_loss = MSELoss()            original
-        self.binary_loss = LOSSES["BCE"]()  #change Feng
+        ####change feng: MSE to L1,SmoothL1,Dice,BCE
+        self.binary_loss = MSELoss()
+        #self.binary_loss = L1Loss()
+        #self.binary_loss = SmoothL1Loss()
+        #self.binary_loss = DiceLoss()
+        #self.binary_loss = CustomBCELoss()
+        #self.binary_loss = CharbonnierLoss()
+        ####change feng
         self.step = 0
         # metrics
         from torchmetrics.functional import structural_similarity_index_measure
@@ -632,6 +644,17 @@ class NerfactoModel(Model):
                 )
             # Add loss from camera optimizer
             self.camera_optimizer.get_loss_dict(loss_dict)
+        #### change feng
+        # 提取 PSNR值，并输出到日志文件
+        psnr_value = metrics_dict.get("psnr", 0)
+
+        total_loss = loss_dict.get("total_loss", sum(loss_dict.values()))
+        log_message = (f"Train Loss: {total_loss.item():.4f}, "
+                       f"Validation PSNR: {psnr_value:.4f}")
+        with open("training_log.txt", "a") as f:
+            f.write(log_message + "\n")
+        print(log_message)
+       #### change feng
         return loss_dict
 
     def get_image_metrics_and_images(
