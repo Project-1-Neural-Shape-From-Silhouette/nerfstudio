@@ -4,3 +4,6 @@
 1. Modified the traditional NeRF pipeline to adapt it for binary data, including changes to the neural network, adaptations to the renderer, and modifications to the exporter.
 2. Optimized the generated meshes to capture finer details.
 3. Utilized Blender to enhance mesh visualization by applying various textures.
+
+### Chuyingjia Feng
+1.Implemented Image Segmentation Techniques: Developed scripts for image segmentation using three different methods: UNet-based segmentation, Otsu's Thresholding, and the GrabCut algorithm. https://github.com/Project-1-Neural-Shape-From-Silhouette/Image-Segmentation
