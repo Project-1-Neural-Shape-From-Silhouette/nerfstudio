@@ -248,12 +248,12 @@ class NerfactoModel(Model):
 
         # losses
     ####change feng: MSE to L1,SmoothL1,Dice,BCE
-        #self.binary_loss = MSELoss()
+        self.binary_loss = MSELoss()
         #self.binary_loss = L1Loss()
         #self.binary_loss = SmoothL1Loss()
         #self.binary_loss = DiceLoss()
         #self.binary_loss = CustomBCELoss()
-        self.binary_loss = CharbonnierLoss()
+        #self.binary_loss = CharbonnierLoss()
         ####change feng
         self.step = 0
         # metrics
