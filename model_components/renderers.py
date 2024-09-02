@@ -419,7 +419,7 @@ class BinaryRenderer(nn.Module):#liuyuhan
         '''
 
         binary = self.combine_binary(
-            binary, weights,ray_indices=ray_indices
+            binary, weights
         )
         
         
