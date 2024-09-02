@@ -38,7 +38,7 @@ class SmoothL1Loss(nn.Module):
 
     def forward(self, predictions, targets):
         diff = torch.abs(predictions - targets)
-        diff = torch.clamp(diff, max=1e6)  # 限制差值的最大值，防止溢出
+        diff = torch.clamp(diff, max=1e6)  # Limit the maximum value of the difference to prevent overflow
         loss = torch.where(
             diff < self.beta,
             0.5 * diff ** 2 / (self.beta + self.epsilon),
@@ -106,24 +106,24 @@ class CharbonnierLoss(nn.Module):
 
     def __init__(self, epsilon=1e-6):
         """
-        初始化Charbonnier Loss
+        Initialize the Charbonnier Loss.
         
-        参数:
-        epsilon (float): 防止平方根中出现零的极小常数，默认为1e-6
+        Parameters:
+        epsilon (float): A small constant to prevent zero inside the square root, default is 1e-6.
         """
         super(CharbonnierLoss, self).__init__()
         self.epsilon = epsilon
 
     def forward(self, predictions, targets):
         """
-        前向传播函数，计算损失值
+        Forward function to compute the loss value.
 
-        参数:
-        predictions (torch.Tensor): 模型的预测值
-        targets (torch.Tensor): 目标值（真实值）
+        Parameters:
+        predictions (torch.Tensor): The predicted values from the model.
+        targets (torch.Tensor): The target values (ground truth).
 
-        返回:
-        torch.Tensor: 计算得到的Charbonnier Loss值
+        Returns:
+        torch.Tensor: The computed Charbonnier Loss value.
         """
         diff = predictions - targets
         # Calculate the Charbonnier loss
@@ -138,7 +138,6 @@ class CharbonnierLoss(nn.Module):
 
         # Return the mean loss
         return torch.mean(loss)
-
 
 
 
