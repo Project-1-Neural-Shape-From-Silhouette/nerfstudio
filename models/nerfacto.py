@@ -423,7 +423,7 @@ class NerfactoModel(Model):
             self.camera_optimizer.get_loss_dict(loss_dict)
         
         #### change feng
-        # 提取 PSNR值，并输出到日志文件
+        # Extract PSNR value and output to the log file
         psnr_value = metrics_dict.get("psnr", 0)
 
         total_loss = loss_dict.get("total_loss", sum(loss_dict.values()))
